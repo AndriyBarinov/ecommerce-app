@@ -1,18 +1,17 @@
 import Head from 'next/head';
 import { Inter } from 'next/font/google';
+import { ApolloClient, InMemoryCache, gql } from '@apollo/client';
 
 import Image from 'next/image';
 import Header from '@components/Header/Header';
 import Container from '@components/Container/Container';
 import Button from '@components/Button/Button';
 
-import products from '@data/products.json';
-
 import styles from '@styles/Home.module.scss';
 
 const inter = Inter({ subsets: ['latin'] });
 
-export default function Home() {
+export default function Home({ products }) {
   return (
     <>
       <Head>
@@ -30,18 +29,19 @@ export default function Home() {
           <h2>Available Cards</h2>
           <ul className={styles.products}>
             {products.map((product) => {
+              const { featuredImage } = product;
               return (
                 <li key={product.id}>
                   <Image
-                    width='864'
-                    height='1200'
+                    width={featuredImage.mediaDetails.width}
+                    height={featuredImage.mediaDetails.height}
                     layout='intrinsic'
-                    src={product.image}
-                    alt={`Card of ${product.title} `}
+                    src={product.featuredImage.sourceUrl}
+                    alt={featuredImage.altText}
                     className={styles.productImage}
                   />
-                  <h3 className={styles.productTitle}>{product.title} 12</h3>
-                  <p className={styles.productPrice}>${product.price}</p>
+                  <h3 className={styles.productTitle}>{product.title}</h3>
+                  <p className={styles.productPrice}>${product.productPrice}</p>
                   <Button>Add to Cart</Button>
                 </li>
               );
@@ -54,4 +54,62 @@ export default function Home() {
       </footer>
     </>
   );
+}
+
+export async function getStaticProps() {
+  const client = new ApolloClient({
+    uri: 'https://new.page.co.ua/graphql/',
+    cache: new InMemoryCache(),
+  });
+
+  const response = await client.query({
+    query: gql`
+      query AllProducts {
+        products {
+          edges {
+            node {
+              id
+              content
+              title
+              uri
+              product {
+                productPrice
+                productId
+              }
+              slug
+              featuredImage {
+                node {
+                  altText
+                  sourceUrl
+                  mediaDetails {
+                    height
+                    width
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `,
+  });
+
+  const products = response.data.products.edges.map(({ node }) => {
+    const data = {
+      ...node,
+      ...node.product,
+      featuredImage: {
+        ...node.featuredImage.node,
+      },
+    };
+    return data;
+  });
+
+  console.log(products);
+
+  return {
+    props: {
+      products,
+    },
+  };
 }
